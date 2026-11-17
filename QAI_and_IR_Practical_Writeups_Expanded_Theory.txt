@@ -1,0 +1,769 @@
+QUANTUM AI (QAI) AND INFORMATION RETRIEVAL (IR)
+PRACTICAL WRITE-UPS
+
+SECTION A: QUANTUM AI (QAI)
+The five Quantum AI practicals are presented first, as requested.
+
+PRACTICAL 1: QUANTUM FOURIER TRANSFORM USING QISKIT
+============================================================
+
+PROBLEM STATEMENT
+Implement a five-qubit Quantum Fourier Transform (QFT) circuit using Qiskit. Apply Hadamard and controlled phase-rotation gates, reverse the qubit order using SWAP gates, measure the qubits, and execute the circuit on a quantum simulator.
+
+THEORY
+THEORY
+
+1. Introduction to Quantum Computing
+Quantum computing uses quantum bits, called qubits, to represent and process information. Unlike a classical bit, which has a definite value of either 0 or 1, a qubit can exist in a linear combination of the two computational basis states. A general pure single-qubit state is written as:
+
+|psi> = alpha|0> + beta|1>
+
+where alpha and beta are complex probability amplitudes and |alpha|^2 + |beta|^2 = 1. When the qubit is measured in the computational basis, the probabilities of obtaining 0 and 1 are |alpha|^2 and |beta|^2 respectively.
+
+2. Meaning of the Quantum Fourier Transform
+The Quantum Fourier Transform (QFT) is the quantum version of the discrete Fourier transform. It changes the representation of a quantum state by converting computational-basis information into relative phases across a superposition of basis states. It is an important building block in quantum algorithms, particularly phase estimation and algorithms that exploit periodicity.
+
+For an n-qubit register, let N = 2^n. The QFT acts on a computational basis state |x> as:
+
+QFT|x> = (1/sqrt(N)) * sum(y=0 to N-1) exp(2*pi*i*x*y/N)|y>
+
+Here, x is the input integer, y indexes the output basis states, and i is the imaginary unit. The factor 1/sqrt(N) ensures that the output state is normalized. The complex exponential determines the phase associated with each output basis state.
+
+3. Quantum Gates Used in the QFT
+The circuit is assembled from elementary quantum gates:
+- Hadamard gate (H): creates an equal superposition from a computational-basis state. Its matrix is (1/sqrt(2)) [[1, 1], [1, -1]].
+- Controlled phase gate CP(theta): applies a phase factor e^(i*theta) to the |11> component of the two-qubit state while leaving the other computational-basis components unchanged.
+- SWAP gate: exchanges the states of two qubits. It is used at the end of the standard QFT circuit to reverse the order of the qubits.
+
+The controlled rotations use progressively smaller angles. In this practical, the angle between qubits j and k is pi/2^(k-j). These rotations encode the phase relationships required by the Fourier transform.
+
+4. Circuit Structure and Qubit Ordering
+The QFT circuit applies a Hadamard gate to a qubit and then applies controlled phase rotations involving the remaining qubits. Repeating this process across the register builds the required phase relationships. The resulting qubit order is reversed relative to the conventional binary ordering, so SWAP gates exchange the outer qubits, then the next inner pair, and so on.
+
+Qubit ordering matters because Qiskit displays and stores multi-qubit states using its own bit-ordering conventions. When interpreting a circuit diagram or measurement string, the mapping between qubit indices and classical-bit positions must be considered.
+
+5. Measurement and Simulation
+Measurement converts quantum information into classical outcomes. A simulator samples from the probability distribution defined by the final quantum state. The number of repetitions is called the number of shots. With more shots, the observed frequencies generally provide a better estimate of the underlying probabilities, although finite-sample variation remains.
+
+The supplied practical initializes all five qubits in |00000>. The QFT of this state is an equal superposition over all 32 computational basis states. Therefore, ideal computational-basis measurements should approach a uniform distribution over the 32 possible bit strings. This is a useful check of the circuit implementation.
+
+6. Applications and Limitations
+The QFT is used as a component in quantum phase estimation, order-finding, and period-finding algorithms. It does not automatically provide an exponential speedup for every Fourier-transform task: the advantage depends on how the transformed quantum state is used and whether the result can be extracted without measuring away useful phase information.
+
+In this practical, Qiskit and AerSimulator provide a software-based demonstration. A simulator does not reproduce every physical limitation of a real quantum processor unless noise and hardware constraints are explicitly modelled.
+IMPLEMENTATION / ALGORITHM
+1. Import Matplotlib, QuantumCircuit, transpile, and AerSimulator.
+2. Set the number of qubits to five and create a five-qubit quantum circuit with five classical bits.
+3. Use the default initial state |00000>.
+4. For each qubit j:
+   a. Apply a Hadamard gate to qubit j.
+   b. For every later qubit k, apply a controlled phase gate from qubit k to qubit j.
+   c. Calculate the rotation angle as pi / 2^(k-j).
+5. Apply SWAP gates between the first and last qubits, then the second and second-last qubits, to reverse the qubit order.
+6. Measure all five qubits into the corresponding classical bits.
+7. Print the circuit diagram.
+8. Create an AerSimulator and transpile the circuit for the simulator.
+9. Execute the circuit for 1024 shots and obtain the measurement counts.
+10. Print the counts and plot them using a measurement histogram.
+
+CONCLUSION
+A five-qubit QFT circuit was created and executed using Qiskit AerSimulator. The implementation demonstrates the use of Hadamard gates, controlled phase rotations, qubit-order reversal, and measurement. The simulator returns measurement counts that can be visualized as a histogram. The measured distribution depends on the input state; this practical starts from |00000>, so the output should be interpreted in that context.
+
+============================================================
+
+PRACTICAL 2: QUANTUM ERROR DETECTION AND CORRECTION USING A BIT-FLIP CODE
+============================================================
+
+PROBLEM STATEMENT
+Implement a three-qubit repetition code to detect and correct a bit-flip error. Encode a logical qubit, deliberately introduce an X error on the second data qubit, measure error syndromes using two ancilla qubits, apply conditional correction gates, and verify the corrected output using a quantum simulator.
+
+THEORY
+THEORY
+
+1. Need for Quantum Error Correction
+Quantum states are sensitive to unwanted interactions with their environment, imperfect control pulses, and measurement errors. Such disturbances can change the state of a qubit. Quantum error correction (QEC) protects encoded information by adding redundancy and detecting error information without directly measuring the logical information being protected.
+
+In classical computing, a repetition code can store a bit several times. For example, 0 may be represented as 000 and 1 as 111. If one bit changes, majority voting can recover the original value. Quantum error correction uses a related idea, but it must preserve quantum superposition and avoid directly measuring the encoded logical state.
+
+2. Bit-Flip Error and Pauli-X Gate
+A bit-flip error exchanges the computational basis states:
+
+X|0> = |1>
+X|1> = |0>
+
+The Pauli-X operator is represented by the matrix [[0, 1], [1, 0]]. A bit-flip error on a qubit can therefore be represented by applying an X gate to that qubit. The practical deliberately applies this error to the second data qubit so that the correction mechanism can be tested in a controlled way.
+
+3. Three-Qubit Repetition Code
+The three-qubit repetition code encodes the logical basis states as:
+
+|0_L> = |000>
+|1_L> = |111>
+
+A general logical qubit alpha|0> + beta|1> is encoded as:
+
+|psi_L> = alpha|000> + beta|111>
+
+The information is distributed across three physical qubits. A single bit flip changes one component of the encoded word and creates a detectable parity mismatch. The logical state is not determined by reading an individual data qubit.
+
+4. Syndrome Measurement
+A syndrome is a set of measurement results that identifies the error pattern. This practical uses two parity checks:
+- Check 1 compares data qubits 0 and 1.
+- Check 2 compares data qubits 1 and 2.
+
+Ancilla qubits store these parity results. CNOT operations from the data qubits to an ancilla compute the parity information. Measuring the ancillas reveals whether each pair agrees or differs. Because the ancillas capture parity rather than the logical value itself, the procedure is designed to diagnose the error without directly measuring the encoded data in the computational basis.
+
+For the stated bit-order convention, the syndrome patterns identify the location of a single error:
+- 01: data qubit 0 is affected.
+- 11: data qubit 1 is affected.
+- 10: data qubit 2 is affected.
+- 00: no single bit-flip error is detected.
+
+5. Conditional Correction
+After identifying the error location, the circuit applies an X gate to the corresponding data qubit. Applying X a second time reverses the bit flip because X squared equals the identity operator. The corrected data register is then measured to verify recovery for the test case.
+
+6. Scope and Limitations
+The three-qubit repetition code corrects one bit-flip error. It does not, by itself, correct phase-flip errors. A phase flip is represented by the Pauli-Z operator, which changes the phase of |1> relative to |0>. More advanced codes combine bit- and phase-error protection to correct arbitrary single-qubit errors.
+
+The code also cannot reliably correct two or more simultaneous bit flips using the same majority/parity logic. The practical begins with logical |0>, so its encoded state is |000>; the injected error on the middle qubit should be detected and corrected back to |000>. This is a demonstration of the bit-flip code rather than a complete fault-tolerant quantum computer.
+IMPLEMENTATION / ALGORITHM
+1. Import Matplotlib, Qiskit circuit/register classes, transpile, and AerSimulator.
+2. Create a three-qubit data register and a two-qubit ancilla register.
+3. Create a two-bit syndrome register and a three-bit output register.
+4. Construct a quantum circuit using these registers.
+5. Encode the logical |0> state using CNOT gates from data qubit 0 to data qubits 1 and 2. Since the initial state is |000>, this leaves the encoded state as |000>.
+6. Introduce a deliberate bit-flip error by applying an X gate to data qubit 1.
+7. Perform parity checks:
+   a. Use CNOT gates from data qubits 0 and 1 to ancilla qubit 0.
+   b. Use CNOT gates from data qubits 1 and 2 to ancilla qubit 1.
+8. Measure the two ancilla qubits into the syndrome register.
+9. Apply conditional corrections:
+   - If the syndrome is 01 (integer value 1), apply X to data qubit 0.
+   - If the syndrome is 11 (integer value 3), apply X to data qubit 1.
+   - If the syndrome is 10 (integer value 2), apply X to data qubit 2.
+10. Measure all three data qubits into the output register.
+11. Print the circuit, transpile it for AerSimulator, and execute 1024 shots.
+12. Display the measurement counts and extract the corrected output-register counts for plotting.
+
+CONCLUSION
+The three-qubit repetition code detected the deliberately introduced bit-flip error through parity measurements and applied the corresponding conditional X correction. The corrected output is expected to return to the encoded |000> state for this experiment. The practical demonstrates syndrome-based error correction for a single bit-flip error.
+
+============================================================
+
+PRACTICAL 3: RANDOMIZED BENCHMARKING OF A QUANTUM CIRCUIT
+============================================================
+
+PROBLEM STATEMENT
+Implement a simplified single-qubit randomized benchmarking experiment using Qiskit. Generate random Clifford sequences of different lengths, append the inverse operation, execute the circuits using a depolarizing noise model, measure the survival probability, fit an exponential decay curve, and estimate the error rate per Clifford.
+
+THEORY
+THEORY
+
+1. Quantum Gate Errors
+Quantum circuits are built by applying operations, or gates, to qubits. Real quantum devices do not implement gates perfectly. Errors can arise from imperfect calibration, control noise, decoherence, unwanted interactions, and readout limitations. As a circuit becomes deeper, errors can accumulate and reduce the reliability of its output.
+
+A useful way to characterize a quantum processor is to estimate the average error associated with its gates. Randomized Benchmarking (RB) is a family of protocols designed to estimate this average performance while reducing sensitivity to certain state-preparation and measurement errors.
+
+2. Clifford Operations
+The Clifford group is a set of quantum operations that maps Pauli operators to Pauli operators under conjugation. Common single-qubit Clifford operations can be constructed from gates such as H, S, and their combinations. Clifford operations are useful in benchmarking because they form a mathematically structured gate set and can be efficiently represented and manipulated.
+
+The practical generates random single-qubit Clifford operations. A sequence of these operations is applied to the initial state. The combined operation is then inverted so that, in an ideal noiseless circuit, the qubit returns to its initial state.
+
+3. Randomized Benchmarking Procedure
+For a sequence containing m random Clifford operations:
+- Generate a random sequence of Clifford gates.
+- Compose the gates into one operation.
+- Calculate the inverse of the combined operation.
+- Append the inverse to the original sequence.
+- Measure the final qubit and determine whether it returned to the expected initial state.
+
+The inverse is essential. It makes the ideal overall operation the identity, so deviations from the expected output can be attributed primarily to errors accumulated during the sequence and its implementation.
+
+4. Survival Probability and Exponential Decay
+The survival probability is the fraction of measurement shots that return the expected initial result. In this practical, the initial state is |0>, so the program uses the frequency of outcome 0 divided by the total number of shots.
+
+As the sequence length increases, more noisy operations are applied and survival probability generally decreases. A commonly used simplified decay model is:
+
+P(m) = A * p^m + B
+
+where m is the sequence length, p is the decay parameter, and A and B account for state-preparation, measurement, and offset effects in the fitted curve. The parameter p describes how quickly the survival probability decays as more operations are applied.
+
+5. Depolarizing Noise Model
+The depolarizing channel is a mathematical model of noise that represents a process in which a quantum state is partially replaced by a maximally mixed state. Its probability parameter controls the strength of the noise. A larger depolarizing probability generally causes stronger degradation of the state.
+
+The supplied code attaches a single-qubit depolarizing error to selected one-qubit gates and defines a two-qubit depolarizing error for CX gates. The single-qubit sequence is the focus of the experiment. The CX noise definition is included in the simulator model but only affects a circuit if the relevant gate is present after transpilation.
+
+6. Estimating Error per Clifford
+For a single-qubit randomized benchmarking experiment, the practical estimates the average error per Clifford using:
+
+r = (1 - p) / 2
+
+This relation is specific to the single-qubit case and the assumptions of the simplified benchmarking model. It should not be applied unchanged to multi-qubit benchmarking or to every noise process.
+
+7. Experimental Considerations
+The program evaluates multiple sequence lengths, averages over ten random sequences per length, and uses 1024 measurement shots for each sequence. Random sequence selection and finite shot counts introduce statistical variation. More sequences and more shots can improve the stability of the estimate. The resulting value characterizes the simulated noise configuration, not the measured performance of a physical quantum processor.
+IMPLEMENTATION / ALGORITHM
+1. Import NumPy, Matplotlib, SciPy's curve_fit, and the required Qiskit Clifford, circuit, simulator, and noise classes.
+2. Create a NoiseModel.
+3. Define a single-qubit depolarizing error with probability 0.002 and a two-qubit depolarizing error with probability 0.01.
+4. Attach the single-qubit error to X, SX, and RZ gates, and the two-qubit error to CX gates.
+5. Create an AerSimulator using the noise model.
+6. Define sequence lengths: 1, 2, 4, 8, 16, 32, 64, and 100.
+7. Set the number of shots to 1024 and the number of random sequences per length to 10.
+8. For each sequence length:
+   a. Generate ten random sequences of single-qubit Clifford operations.
+   b. Compose the Clifford circuits into a sequence circuit.
+   c. Convert the complete sequence into a Clifford representation.
+   d. Calculate its adjoint and convert that inverse operation into a circuit.
+   e. Append the sequence and inverse to a one-qubit circuit.
+   f. Measure the qubit.
+   g. Transpile and execute the circuit on the noisy simulator for 1024 shots.
+   h. Calculate survival probability as the frequency of outcome '0' divided by the number of shots.
+   i. Average the survival probabilities over the ten sequences.
+9. Store and print the average survival probability for every sequence length.
+10. Fit the model A * p^m + B to the measured data using curve_fit, with bounded parameters.
+11. Calculate the estimated error rate using (1-p)/2.
+12. Plot the experimental survival probabilities and the fitted exponential decay curve.
+
+CONCLUSION
+A simplified single-qubit randomized benchmarking experiment was simulated under a depolarizing noise model. The survival probability was measured for increasing sequence lengths, and an exponential curve was fitted to estimate the decay parameter and error rate per Clifford. The experiment illustrates how randomized benchmarking characterizes average gate performance. The estimate is dependent on the simulated noise assumptions and the limited number of random sequences and shots.
+
+============================================================
+
+PRACTICAL 4: QUANTUM RANDOM NUMBER GENERATOR
+============================================================
+
+PROBLEM STATEMENT
+Implement a 16-qubit quantum random number generator using Qiskit. Apply Hadamard gates to all qubits, measure the qubits using a quantum simulator, convert a measured 16-bit binary string into its decimal equivalent, and display the measurement distribution.
+
+THEORY
+THEORY
+
+1. Classical and Quantum Randomness
+A classical pseudo-random number generator produces a sequence of values using a deterministic algorithm and an initial seed. Such generators can produce statistically useful sequences, but if the algorithm and seed are known, the sequence can in principle be reproduced.
+
+A quantum random number generator (QRNG) uses the probabilistic nature of quantum measurement. A qubit prepared in an equal superposition of |0> and |1> has equal probabilities of producing either result when measured in the computational basis. The individual result cannot be predicted with certainty from the ideal quantum state alone.
+
+2. Qubit Superposition and Hadamard Gate
+A qubit can be represented as:
+
+|psi> = alpha|0> + beta|1>
+
+where |alpha|^2 + |beta|^2 = 1. The Hadamard gate is:
+
+H = (1/sqrt(2)) [[1, 1], [1, -1]]
+
+Applying it to |0> gives:
+
+H|0> = (|0> + |1>)/sqrt(2)
+
+The two outcomes therefore have equal probability:
+
+P(0) = 1/2
+P(1) = 1/2
+
+3. Generating a 16-Qubit Superposition
+Applying a Hadamard gate independently to each of 16 qubits initialized in |0> creates an equal superposition of all 2^16 computational basis states. There are 65,536 possible 16-bit strings. In an ideal simulator, each string has probability 1/65,536.
+
+A measurement of all 16 qubits returns one 16-bit classical string. Converting that string from base 2 to base 10 produces an integer between 0 and 65,535.
+
+4. Measurement and Sampling
+Quantum measurement converts a quantum state into a classical result according to the Born rule: the probability of observing a basis state is the squared magnitude of its amplitude. Repeating the circuit for many shots produces a count for each observed bit string. These counts provide an empirical view of the probability distribution.
+
+The number of shots affects how many outcomes are sampled. With 1024 shots and 65,536 possible strings, many possible outcomes will not appear at all. This is expected and does not imply that the circuit is malfunctioning.
+
+5. Important Interpretation of the Program Output
+The supplied implementation selects the most frequently observed bit string from the 1024 shots and prints it as the generated number. This is the mode of the sample, not a uniformly selected shot. If all outcomes are equally likely, ties and sampling fluctuations can make the mode arbitrary. A more direct way to obtain one random value would be to select one individual measured shot.
+
+6. Applications and Practical Limitations
+Quantum random numbers can be useful in cryptography, simulation, randomized algorithms, and security-sensitive systems. However, a software simulator uses a classical pseudo-random process to sample the quantum measurement distribution. It demonstrates the circuit and probability model, but it is not a physical quantum entropy source. A production QRNG requires a characterized physical quantum device, suitable randomness extraction, and statistical validation.
+IMPLEMENTATION / ALGORITHM
+1. Import NumPy, Matplotlib, QuantumCircuit, transpile, and AerSimulator.
+2. Set n = 16 and create a quantum circuit containing 16 qubits and 16 classical bits.
+3. Apply a Hadamard gate to every qubit to create superposition.
+4. Measure all qubits into their corresponding classical bits.
+5. Print the circuit diagram.
+6. Create an AerSimulator and transpile the circuit.
+7. Execute the circuit for 1024 shots.
+8. Retrieve the measurement counts.
+9. Select the most frequent bit string using the maximum count.
+10. Remove spaces from the bit string and convert it from base 2 to a decimal integer.
+11. Print the binary and decimal values.
+12. Sort the measurement outcomes by frequency, retain the top 20, and plot their counts as a bar chart.
+
+CONCLUSION
+A 16-qubit quantum random-number circuit was implemented using Hadamard gates and measurement. The measured bit strings were converted into decimal form, and the most frequent outcomes were visualized. The practical demonstrates quantum measurement-based bit generation in a simulator. For an application requiring one randomly selected output, the implementation should select an individual measurement shot rather than the most frequent result.
+
+============================================================
+
+PRACTICAL 5: QUANTUM TELEPORTATION USING QISKIT
+============================================================
+
+PROBLEM STATEMENT
+Implement a quantum teleportation circuit using Qiskit. Prepare an arbitrary single-qubit state, create an entangled Bell pair shared between Alice and Bob, perform a Bell-state measurement at Alice's side, apply conditional correction gates at Bob's side, and measure Bob's final qubit using a quantum simulator.
+
+THEORY
+THEORY
+
+1. Concept of Quantum Teleportation
+Quantum teleportation is a protocol that transfers an unknown quantum state from one party to another using shared entanglement and classical communication. The original physical qubit is not transported. Instead, the sender performs a joint measurement, communicates two classical bits, and the receiver applies a correction to reconstruct the state.
+
+The protocol does not violate the no-cloning principle: the measurement destroys the original state at the sender's location as part of the process. It also does not enable faster-than-light communication because the receiver needs the classical measurement results before completing the reconstruction.
+
+2. Input Qubit State
+A general pure qubit can be expressed as:
+
+|psi> = alpha|0> + beta|1>
+
+where alpha and beta are complex amplitudes and |alpha|^2 + |beta|^2 = 1. The supplied practical prepares a particular input state using rotations:
+
+|psi> = RZ(phi) RY(theta) |0>
+
+with theta = 1.2 and phi = 0.8. The rotation gates change the amplitudes and relative phase of the input qubit. The state is selected by the program; it is not an unknown state supplied externally.
+
+3. Entanglement and Bell Pair
+The protocol requires Alice and Bob to share an entangled pair. A Bell pair can be prepared by applying a Hadamard gate to one qubit and then a CNOT gate with that qubit as control and the other as target:
+
+|Phi+> = (|00> + |11>)/sqrt(2)
+
+The two qubits are correlated in a way that cannot be described as independent pure states. Alice holds one member of the pair and Bob holds the other. The entanglement is the shared quantum resource used by the teleportation protocol.
+
+4. Bell-Basis Measurement
+Alice holds the input qubit and her half of the Bell pair. She applies a CNOT gate from the input qubit to her entangled qubit, followed by a Hadamard gate on the input qubit. These gates transform the state into a form where computational-basis measurement corresponds to a Bell-basis measurement.
+
+Alice measures both qubits, producing two classical bits. The four possible outcomes correspond to four possible correction operations that Bob must apply. The measurement outcomes are random, but the protocol ensures that the appropriate correction recovers the input state.
+
+5. Classical Communication and Pauli Corrections
+Alice sends the two measurement bits to Bob through a classical channel. Based on those bits, Bob applies Pauli corrections:
+- X correction: reverses a bit flip.
+- Z correction: reverses a relative phase flip.
+- Both corrections may be required for one of the four outcomes.
+- If neither correction is required, Bob leaves the qubit unchanged.
+
+The supplied circuit uses conditional X and Z operations controlled by Alice's classical measurement results. Once these corrections are applied, Bob's qubit represents the original input state, up to the circuit's bit-order and control conventions.
+
+6. Verification of Teleportation
+The practical measures Bob's final qubit in the computational basis and plots the counts. This confirms the output measurement distribution, but a single measurement basis cannot fully establish that an arbitrary quantum state has been reconstructed. For stronger verification, one can compare the output state with the prepared input using state tomography or calculate state fidelity.
+
+7. Significance and Limitations
+Quantum teleportation is a foundational protocol for quantum communication, distributed quantum computing, and quantum networking. It requires a pre-shared entangled pair and classical communication, so it does not send information instantaneously. The supplied experiment is a simulator demonstration using a fixed prepared state and finite measurement shots.
+IMPLEMENTATION / ALGORITHM
+1. Import Matplotlib, Qiskit circuit/register classes, transpile, and AerSimulator.
+2. Create a three-qubit quantum register:
+   - q[0]: input state.
+   - q[1]: Alice's entangled qubit.
+   - q[2]: Bob's entangled qubit.
+3. Create a two-bit classical register for Alice's Bell measurement and a one-bit register for Bob's final measurement.
+4. Prepare the input state on q[0] by applying RY(theta) and RZ(phi), where theta = 1.2 and phi = 0.8.
+5. Create the Bell pair between q[1] and q[2] by applying H to q[1] and CNOT from q[1] to q[2].
+6. Perform Alice's Bell-basis transformation by applying CNOT from q[0] to q[1], followed by H on q[0].
+7. Measure q[0] and q[1] into the two classical measurement bits.
+8. Apply Bob's conditional corrections:
+   - Apply X to q[2] if measurement[1] is 1.
+   - Apply Z to q[2] if measurement[0] is 1.
+9. Measure Bob's qubit q[2] into the output register.
+10. Print the circuit diagram.
+11. Transpile and execute the circuit on AerSimulator for 1024 shots.
+12. Print the measurement counts and plot the histogram.
+
+CONCLUSION
+The quantum teleportation circuit was implemented and executed on a simulator. It prepared an input state, generated shared entanglement, performed Alice's Bell measurement, and applied conditional Pauli corrections to Bob's qubit. The final measurement demonstrates the teleportation protocol at the circuit level. Since the final output is measured in the computational basis, the histogram alone does not fully verify preservation of an arbitrary quantum state; state tomography or fidelity comparison would provide a stronger verification.
+
+============================================================
+
+
+SECTION B: INFORMATION RETRIEVAL (IR)
+The five Information Retrieval practicals follow the QAI section.
+
+PRACTICAL 1: TEXT PREPROCESSING USING NLTK
+============================================================
+
+PROBLEM STATEMENT
+Perform text preprocessing on a sample text using Python and NLTK. Convert text to lowercase, tokenize it into words, remove English stop words, apply Porter stemming, and display the final processed text.
+
+THEORY
+THEORY
+
+1. Introduction to Text Preprocessing
+Text preprocessing is the process of converting raw text into a consistent form suitable for information retrieval and natural language processing. Documents may contain uppercase and lowercase characters, punctuation, common grammatical words, and different inflected forms of the same term. These variations can make direct comparison and analysis difficult.
+
+A preprocessing pipeline reduces unnecessary variation and produces tokens that are easier to index, compare, and analyse. The exact steps depend on the application: aggressive normalization can improve matching in some systems but may remove useful meaning in others.
+
+2. Lowercasing
+Lowercasing converts uppercase letters into lowercase letters. For example, 'Search', 'SEARCH', and 'search' become the same token. This reduces case-based differences and helps ensure that equivalent terms are treated consistently. However, case can carry meaning in some tasks, such as distinguishing proper nouns or abbreviations, so lowercasing is not always appropriate for every NLP application.
+
+3. Tokenization
+Tokenization divides a text stream into smaller units called tokens. In this practical, a regular expression extracts alphabetic sequences. For example, a sentence such as 'Information Retrieval is useful.' is converted into tokens such as ['information', 'retrieval', 'is', 'useful'] after lowercasing.
+
+Tokenization determines what the system considers a word. The regular expression used here does not preserve punctuation and does not treat digits or alphanumeric identifiers as tokens. More advanced tokenizers may handle contractions, hyphenated words, numbers, URLs, and language-specific rules.
+
+4. Stop-Word Removal
+Stop words are frequent words such as 'the', 'is', 'and', and 'of'. They often contribute limited value to simple term-matching tasks because they appear in many documents. Removing them can reduce index size and allow more informative terms to receive greater emphasis.
+
+The practical uses NLTK's English stop-word list. Stop-word removal is task-dependent: words that are common in general language may be important in a particular query or domain. For example, negation terms such as 'not' can change meaning and should not be removed indiscriminately in sentiment analysis or question answering.
+
+5. Stemming
+Stemming reduces related word forms to a common stem. The practical uses the Porter stemming algorithm, a rule-based suffix-stripping method. For example, words such as 'connected', 'connecting', and 'connection' may be reduced to forms that are closer for matching purposes.
+
+A stem is not necessarily a valid English word. Stemming is generally faster and simpler than morphological analysis, but it can sometimes over-stem unrelated words or fail to combine forms that share a linguistic root.
+
+6. NLTK and the Stop-Word Corpus
+NLTK is a Python toolkit for natural language processing. It provides tokenization utilities, corpora, stop-word lists, and stemming algorithms. The practical imports the English stop-word corpus and PorterStemmer. The stop-word corpus must be available locally, which is why the program calls nltk.download('stopwords').
+
+7. Importance in Information Retrieval
+Preprocessing helps normalize documents and queries before indexing or matching. When the same processing rules are applied consistently to both documents and queries, term matching becomes more reliable. The practical demonstrates a basic pipeline: lowercase, tokenize, remove stop words, stem, and combine the remaining tokens.
+
+The output is a processed token sequence rather than a complete semantic representation. It does not understand context, word sense, grammar, or meaning. These limitations should be considered when using the processed text in a larger retrieval or NLP system.
+IMPLEMENTATION / ALGORITHM
+1. Import NLTK, the regular-expression module, the English stop-word corpus, and PorterStemmer.
+2. Download the NLTK stopwords dataset.
+3. Define the sample input text containing sentences about information retrieval and search engines.
+4. Print the original text.
+5. Convert the text to lowercase.
+6. Tokenize the text using the regular expression pattern that extracts alphabetic words.
+7. Print the tokenized words.
+8. Load the English stop-word list and convert it into a set for efficient membership checking.
+9. Create a filtered list containing only tokens that are not stop words.
+10. Print the filtered tokens.
+11. Create a PorterStemmer object.
+12. Apply the stemmer to each filtered token.
+13. Print the stemmed tokens.
+14. Join the stemmed tokens with spaces to produce the final processed text.
+15. Print the final processed text.
+
+CONCLUSION
+Text preprocessing was performed successfully using NLTK. The sample text was converted to lowercase, tokenized, filtered to remove English stop words, and stemmed using the Porter algorithm. The final output is a normalized sequence of tokens that can be used as input for downstream NLP and information retrieval tasks.
+
+PRACTICAL 2: INVERTED FILE / INVERTED INDEX FOR INFORMATION RETRIEVAL
+============================================================
+
+PROBLEM STATEMENT
+Implement an inverted index for a small collection of text documents. Tokenize the documents, store the document identifiers and positions associated with each term, accept a search query, and retrieve documents containing all query terms.
+
+THEORY
+THEORY
+
+1. Introduction to Information Retrieval
+Information Retrieval (IR) is the process of finding relevant information from a collection of documents in response to a user's query. Search engines, digital libraries, document repositories, and enterprise search systems use IR techniques to locate useful documents efficiently.
+
+A retrieval system typically performs document preprocessing, indexing, query processing, matching, and result presentation. An index avoids scanning every document from beginning to end for every query.
+
+2. Forward Index and Inverted Index
+A forward index stores the terms associated with each document. An inverted index reverses this relationship: it maps each term to the documents in which that term occurs. This term-to-document mapping makes it efficient to identify candidate documents containing a query term.
+
+For example, if Document 1 contains 'data science' and Document 2 contains 'data mining', an inverted index can map 'data' to both documents, 'science' to Document 1, and 'mining' to Document 2.
+
+3. Dictionary and Posting Lists
+An inverted index generally contains:
+- A dictionary or vocabulary: the unique terms found in the collection.
+- A posting list for each term: records describing where that term occurs.
+
+A basic posting list may store document identifiers. A positional inverted index also stores the positions of terms within each document. Positions support phrase queries and proximity searches, because the system can determine whether terms occur next to one another or within a specified distance.
+
+The practical stores each posting as a pair containing a document ID and a one-based token position. Repeated occurrences of a term in the same document therefore create multiple positional entries.
+
+4. Index Construction
+To build an inverted index, each document is processed using the same normalization and tokenization rules. Each token is associated with its document identifier and position. A dictionary-like structure maps each token to a list of its postings.
+
+The practical converts text to lowercase and uses a regular expression to extract alphabetic words. It then uses defaultdict(list) to create posting lists automatically when a new term is encountered. The final index is displayed in alphabetical order for readability.
+
+5. Query Processing and Boolean AND Retrieval
+A query is tokenized using the same procedure as the documents. For an AND query containing terms t1, t2, ..., tn, a document is returned only if it contains every query term.
+
+This can be implemented by intersecting the document sets associated with the terms. For example:
+
+D(t1 AND t2) = D(t1) intersection D(t2)
+
+For a query with more terms, the intersection is repeated until all terms have been processed. If any query term is absent from the index, the final result is empty.
+
+6. Why Positional Information Matters
+The program stores positions even though its query operation uses only document-level set intersection. Positional data can support more advanced retrieval operations, such as exact phrase matching ('information retrieval') and proximity matching where two terms must occur within a limited number of positions.
+
+7. Efficiency and Limitations
+An inverted index reduces query-time work because the system examines posting lists rather than scanning the full text collection. Set intersection is straightforward for a small collection. Large-scale search engines use compressed posting lists, skip pointers, optimized merge algorithms, ranking functions, and distributed indexing to improve performance.
+
+The supplied practical implements Boolean AND retrieval only. It does not rank results by relevance, calculate TF-IDF or BM25 scores, support phrase queries, or use semantic similarity. Its purpose is to demonstrate the core data structure and retrieval operation.
+IMPLEMENTATION / ALGORITHM
+1. Import the regular-expression module and defaultdict from collections.
+2. Define four sample documents containing short text passages.
+3. Create an empty inverted index using defaultdict(list).
+4. For each document:
+   a. Convert its text to lowercase.
+   b. Extract alphabetic words using the regular expression pattern that matches sequences of lowercase letters.
+   c. Enumerate the words starting at position 1.
+   d. Add a (document ID, position) pair to the posting list for each word.
+5. Display the inverted index in alphabetical order.
+6. Accept a search query from the user and convert it to lowercase.
+7. Tokenize the query using the same regular expression.
+8. If the query contains terms:
+   a. Initialize the matching document set using documents containing the first query term.
+   b. For each remaining query term, obtain the set of documents containing that term.
+   c. Intersect the current matching set with the new set.
+9. Print the matching documents in sorted order.
+10. If the intersection is empty, print that no matching documents were found. If the query is empty or contains no valid terms, request a valid query.
+
+CONCLUSION
+An inverted index was successfully constructed for the sample document collection. Each term was associated with its document identifiers and positions. The program used set intersection to retrieve documents containing all query terms. This demonstrates the basic indexing and Boolean AND retrieval process used in information retrieval systems.
+
+============================================================
+
+PRACTICAL 3: HEART DISEASE DIAGNOSIS USING A BAYESIAN NETWORK
+============================================================
+
+PROBLEM STATEMENT
+Implement a Bayesian Network to model relationships among selected patient attributes and heart-disease levels. Use the Cleveland Heart Disease dataset, preprocess the data, learn conditional probability distributions, and perform probabilistic inference to estimate the heart-disease level for given evidence such as age or cholesterol.
+
+THEORY
+THEORY
+
+1. Introduction to Probability in Artificial Intelligence
+Many real-world problems involve uncertainty. In medical data, for example, a patient's observed attributes do not always determine a condition with certainty. Probability theory provides a mathematical framework for representing uncertainty and updating beliefs when new evidence becomes available.
+
+Bayesian networks are probabilistic graphical models that combine probability theory with graph structures. They represent random variables and conditional dependencies in a compact form.
+
+2. Bayesian Network Structure
+A Bayesian Network is a directed acyclic graph (DAG). Each node represents a random variable, and each directed edge indicates a direct conditional dependency represented by the model. A directed acyclic graph contains no directed cycles.
+
+Each node is associated with a Conditional Probability Distribution (CPD), which describes the probability of that node given its parent nodes. If a node has no parents, its CPD is simply its prior probability distribution.
+
+The joint probability distribution over all variables is factorized as:
+
+P(X1, X2, ..., Xn) = product_i P(Xi | Parents(Xi))
+
+This factorization can be substantially more compact than storing every possible joint assignment independently, especially when the graph contains relatively few dependencies.
+
+3. Conditional Probability and Bayes' Theorem
+Conditional probability measures the probability of an event given that another event is known:
+
+P(A|B) = P(A and B) / P(B), for P(B) > 0
+
+Bayes' theorem provides a way to update a probability after observing evidence:
+
+P(A|B) = P(B|A)P(A) / P(B)
+
+In a Bayesian Network, inference uses the network structure and learned CPDs to calculate a posterior distribution for a query variable after evidence is supplied.
+
+4. Dataset and Medical Attributes
+The practical uses the Cleveland Heart Disease dataset. It selects attributes including age, sex, resting blood pressure (trestbps), fasting blood sugar indicator (fbs), exercise-induced angina (exang), serum cholesterol (chol), maximum heart rate achieved (thalach), and the heart-disease target.
+
+Continuous variables are discretized into categories such as age groups and blood-pressure or cholesterol levels. Discretization converts numerical measurements into a finite set of states, allowing the use of a discrete Bayesian Network. The categories are modelling choices and may affect the learned probabilities.
+
+5. Network Structure and Conditional Dependencies
+The program defines the following directed relationships:
+- age -> trestbps
+- age -> fbs
+- sex -> trestbps
+- exang -> trestbps
+- trestbps -> heartdisease
+- fbs -> heartdisease
+- heartdisease -> thalach
+- heartdisease -> chol
+
+These edges define the assumed dependency structure used by the model. They should be interpreted as modelling relationships, not proof of causation. In particular, a graph structure selected for a practical exercise does not establish clinical causal relationships.
+
+6. Learning Conditional Probability Distributions
+The practical uses Maximum Likelihood Estimation (MLE) to estimate CPDs from the observed dataset. MLE estimates probabilities using observed frequencies. For a discrete variable, the estimated probability of a state under a given parent configuration is its frequency divided by the total frequency for that configuration.
+
+MLE is straightforward, but estimates can be zero when a state is not observed in the training data for a particular parent configuration. Larger datasets or smoothing methods can reduce the impact of sparse observations. The supplied implementation uses DiscreteMLE as its parameter-learning method.
+
+7. Probabilistic Inference and Variable Elimination
+After the CPDs are learned, inference calculates the distribution of a query variable given evidence. Variable Elimination is an exact inference algorithm for discrete Bayesian Networks. It combines relevant factors and sums out variables that are not part of the query or evidence.
+
+The practical queries the heart-disease distribution using evidence such as a young age category and high cholesterol. The result is a probability distribution over the target states rather than a single certain diagnosis.
+
+8. Interpretation and Limitations
+The output depends on dataset quality, preprocessing, discretization boundaries, network structure, and learned parameters. The practical demonstrates probabilistic modelling and inference; it is not a validated clinical decision-support tool. Its predictions must not be used as a substitute for medical assessment.
+IMPLEMENTATION / ALGORITHM
+1. Import Pandas, NumPy, UCI ML Repository utilities, and the required pgmpy classes.
+2. Fetch the Cleveland Heart Disease dataset using UCI dataset ID 45.
+3. Combine the feature table and target table into a single DataFrame.
+4. Replace '?' values with missing values, normalize column names, rename the target column 'num' to 'heartdisease', and convert columns to numeric values.
+5. Remove records containing missing values.
+6. Discretize continuous attributes:
+   - Age: young, middle, senior, old.
+   - Resting blood pressure: low, normal, high.
+   - Cholesterol: normal, borderline, high.
+   - Maximum heart rate: low, medium, high.
+7. Retain the selected attributes: age, sex, trestbps, fbs, exang, chol, thalach, and heartdisease.
+8. Convert categorical values to strings so that the discrete model can process them.
+9. Create a DiscreteBayesianNetwork using the dependency edges listed in the theory.
+10. Fit the model using DiscreteMLE to estimate the CPDs from the preprocessed data.
+11. Create a VariableElimination inference object.
+12. Run two queries:
+    - Estimate the heart-disease distribution when age is 'young' (the code describes this as age 28).
+    - Estimate the heart-disease distribution when cholesterol is 'high'.
+13. Print the probability distribution for each heart-disease level.
+
+CONCLUSION
+A Bayesian Network was constructed using the Cleveland Heart Disease dataset. The program learned conditional probability distributions using Maximum Likelihood Estimation and performed inference using Variable Elimination. It demonstrates how probabilistic graphical models can represent dependencies among medical attributes and estimate a target distribution from observed evidence. The output is a probabilistic estimate, not a clinical diagnosis.
+
+============================================================
+
+PRACTICAL 4: AGGLOMERATIVE HIERARCHICAL CLUSTERING
+============================================================
+
+PROBLEM STATEMENT
+Perform agglomerative hierarchical clustering on the Iris dataset. Standardize the features, generate a dendrogram, evaluate different cluster counts using the silhouette score, identify the best cluster count among the tested values, and visualize the resulting clusters.
+
+THEORY
+THEORY
+
+1. Introduction to Unsupervised Learning
+Machine learning methods are commonly divided into supervised and unsupervised learning. Supervised learning uses labelled examples, whereas unsupervised learning attempts to discover patterns or structure in data without using target labels during model training.
+
+Clustering is an unsupervised learning task that groups similar observations. A good clustering result places similar data points in the same cluster and dissimilar points in different clusters. Clustering is used in customer segmentation, biological analysis, document grouping, and exploratory data analysis.
+
+2. Hierarchical Clustering
+Hierarchical clustering creates a nested sequence of clusters. The result can be represented by a dendrogram, a tree diagram that shows how individual observations or smaller clusters are combined.
+
+There are two major approaches:
+- Agglomerative clustering: a bottom-up approach that starts with each observation as its own cluster and repeatedly merges clusters.
+- Divisive clustering: a top-down approach that starts with all observations in one cluster and repeatedly splits them.
+
+The practical uses agglomerative clustering.
+
+3. Agglomerative Clustering Procedure
+Initially, every data point forms a separate cluster. At each iteration, the algorithm identifies the two closest clusters and merges them. This process continues until the requested number of clusters remains or all observations have been merged into one cluster.
+
+The definition of distance between clusters depends on the linkage method. Different linkage methods can produce different cluster structures even when the same dataset and distance measure are used.
+
+4. Ward Linkage and Euclidean Distance
+The practical uses Ward linkage. Ward's method chooses the merge that produces the smallest increase in within-cluster sum of squares. In other words, it attempts to keep clusters compact by controlling the increase in within-cluster variance.
+
+Ward linkage is commonly used with Euclidean distance. It tends to produce relatively compact clusters and is sensitive to feature scales. This is why feature standardization is performed before clustering.
+
+5. Feature Standardization
+The Iris dataset contains four numerical features: sepal length, sepal width, petal length, and petal width. Features measured on different scales can contribute unequally to distance calculations. StandardScaler transforms each feature using:
+
+z = (x - mean) / standard deviation
+
+After standardization, each feature has approximately zero mean and unit variance. This allows distance-based clustering to consider the features on a more comparable scale.
+
+6. Dendrogram Interpretation
+A dendrogram displays the sequence of cluster merges. The horizontal axis represents observations or clusters, while the vertical axis represents the linkage distance at which clusters are merged. A large vertical gap between merges can suggest a natural separation in the data. A horizontal cut through the dendrogram determines a possible number of clusters.
+
+The dendrogram is a diagnostic visualization; selecting a cut still requires judgement or a quantitative validation measure.
+
+7. Silhouette Score
+The silhouette score measures how well each observation fits within its assigned cluster compared with the nearest alternative cluster. For an observation i:
+
+s(i) = (b(i) - a(i)) / max(a(i), b(i))
+
+where a(i) is the average distance from i to other points in its own cluster, and b(i) is the lowest average distance from i to points in another cluster.
+
+The score ranges from -1 to 1:
+- Near +1: the observation is well matched to its own cluster and separated from other clusters.
+- Near 0: the observation lies near a cluster boundary.
+- Below 0: the observation may be closer to another cluster than to its assigned cluster.
+
+The practical evaluates cluster counts 2 through 6 and chooses the count with the highest average silhouette score among those tested.
+
+8. Interpretation and Limitations
+The cluster labels are arbitrary identifiers and do not correspond automatically to the Iris species labels. The program uses the first two standardized features for its scatter plot, so the two-dimensional visualization does not show the full four-dimensional clustering space. The selected cluster count is the best among the tested values according to the silhouette score, not necessarily a universally correct number of natural groups.
+IMPLEMENTATION / ALGORITHM
+1. Import NumPy, Pandas, Matplotlib, the Iris dataset loader, StandardScaler, AgglomerativeClustering, silhouette_score, dendrogram, and linkage.
+2. Load the Iris dataset and place its four numerical features into a DataFrame.
+3. Display the first five records.
+4. Standardize all features using StandardScaler.
+5. Generate the hierarchical linkage matrix using SciPy's linkage function with Ward's method.
+6. Plot the dendrogram with data points on the x-axis and Euclidean distance on the y-axis.
+7. Define the cluster counts to evaluate as 2, 3, 4, 5, and 6.
+8. For each cluster count:
+   a. Create an AgglomerativeClustering model with Ward linkage.
+   b. Fit the model and obtain cluster labels.
+   c. Calculate the silhouette score using the standardized features and labels.
+   d. Store and print the score.
+9. Select the cluster count with the maximum silhouette score from the tested values.
+10. Train a final AgglomerativeClustering model using the selected cluster count.
+11. Add the final cluster labels to the original feature DataFrame and display sample assignments and cluster sizes.
+12. Plot a bar chart comparing silhouette scores.
+13. Plot the final cluster assignments using the first two standardized features.
+
+CONCLUSION
+Agglomerative hierarchical clustering was applied to the Iris dataset. The dendrogram illustrated the hierarchical merging process, while silhouette scores were used to compare the tested cluster counts. The final model assigned every sample to a cluster, and the results were visualized. The selected cluster count is optimal only among the values tested by this program and according to the silhouette score.
+
+============================================================
+
+PRACTICAL 5: PAGE RANK ALGORITHM
+============================================================
+
+PROBLEM STATEMENT
+Implement the PageRank algorithm on a directed web-page graph. Represent pages as nodes and hyperlinks as directed edges, calculate PageRank scores, identify the highest-ranked page, and visualize both the link structure and ranking scores.
+
+THEORY
+THEORY
+
+1. Introduction to Link Analysis
+The World Wide Web can be represented as a directed graph. Each web page is a node, and each hyperlink is a directed edge from the page containing the link to the page being referenced.
+
+A simple count of incoming links is not sufficient to measure importance. A page linked by highly important pages may be more valuable than a page linked by many low-importance pages. Link-analysis algorithms use the graph structure to estimate relative importance.
+
+2. PageRank Concept
+PageRank is a link-analysis algorithm originally developed to rank web pages. It assigns each page a numerical score based on the number and quality of incoming links. A link from a page with a high PageRank contributes more than a link from a page with a low PageRank.
+
+The algorithm is based on a random-surfer model. Imagine a user who repeatedly visits pages by following hyperlinks. The long-run probability of being on a particular page is related to that page's PageRank.
+
+3. PageRank Equation
+A common PageRank equation is:
+
+PR(A) = (1-alpha)/N + alpha * sum_(T -> A) [PR(T)/L(T)]
+
+where:
+- PR(A) is the PageRank score of page A.
+- N is the total number of pages.
+- alpha is the damping factor.
+- T -> A represents a link from page T to page A.
+- L(T) is the number of outgoing links from page T.
+
+The first term represents the probability of a random jump to a page. The second term represents the contribution from pages linking to A.
+
+4. Damping Factor
+The damping factor alpha models the probability that the random surfer follows a hyperlink. With probability 1-alpha, the surfer jumps to a page chosen independently of the current page. The practical uses alpha = 0.85, a commonly used illustrative value.
+
+The random-jump component prevents the surfer from becoming trapped in a page or a group of pages with no outgoing path. It also helps make the PageRank calculation well behaved for a wide range of directed graphs.
+
+5. Iterative Calculation
+PageRank values are mutually dependent: the score of a page depends on the scores of pages linking to it. Therefore, scores are calculated iteratively. The algorithm starts with initial scores, repeatedly updates them using the PageRank equation, and stops when the values converge within a specified tolerance or the maximum iteration count is reached.
+
+The practical uses NetworkX's pagerank function with a maximum of 100 iterations and a tolerance of 1e-6. NetworkX handles the iterative computation and returns a score for each node.
+
+6. Directed Graph Representation
+The practical creates four nodes, A, B, C, and D, and adds directed edges representing hyperlinks. The direction of an edge matters: an edge B -> A means page B links to page A. It does not mean that A links back to B.
+
+The resulting scores depend on the complete link structure, not simply on the number of incoming edges. The graph drawing helps visualize how the pages are connected, while the bar chart makes it easier to compare their computed scores.
+
+7. Applications and Limitations
+PageRank is an example of a graph-based ranking method. Similar ideas can be used in citation analysis, social networks, recommendation systems, and analysis of influence in directed networks.
+
+PageRank estimates structural importance, not necessarily content quality, truthfulness, freshness, or relevance to a particular query. Modern search engines combine many ranking signals, so PageRank alone does not represent a complete search engine ranking system.
+IMPLEMENTATION / ALGORITHM
+1. Import NetworkX and Matplotlib.
+2. Create a directed graph using NetworkX DiGraph.
+3. Add four web pages: A, B, C, and D.
+4. Add directed hyperlink edges:
+   - B -> A
+   - B -> C
+   - C -> A
+   - D -> A
+   - D -> B
+   - D -> C
+5. Print the graph's edge list to show the hyperlink structure.
+6. Calculate PageRank using nx.pagerank with damping factor alpha = 0.85, maximum 100 iterations, and tolerance 1e-6.
+7. Sort the pages in descending order of PageRank score and print each score.
+8. Identify the page with the highest score using the maximum PageRank value.
+9. Draw the directed graph using a spring layout, labels, and arrows.
+10. Plot a bar chart of the PageRank scores.
+
+CONCLUSION
+The PageRank algorithm was applied to a directed graph containing four web pages. The program calculated a score for each page based on the incoming links and the importance of linking pages. It identified the highest-ranked page and visualized the link structure and scores. This demonstrates how link analysis can be used to rank web pages by relative importance.
+
+============================================================
+
+============================================================
+END OF PRACTICAL WRITE-UPS
+============================================================
+
+NOTES
+1. The document is organized in the requested order: QAI first, followed by IR.
+2. Each practical includes Problem Statement, Theory, Implementation / Algorithm, and Conclusion.
+3. The write-ups follow the supplied program logic. Simulator outputs may vary with software versions and execution settings.
+4. The Bayesian Network produces probabilistic estimates and is not a clinical diagnostic system.
